@@ -7,6 +7,12 @@
 #include <stdio.h>
 #include <sys/select.h>
 
+void flushInputBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+
 // Create a Socket for server communication
 short SocketCreate(void)
 {
@@ -62,13 +68,14 @@ int SocketReceive(int hSocket, char *Rsp, short RvcSize)
 // main driver program
 int main(int argc, char *argv[])
 {
-    char* username[20];
+    char username[20];
     printf("Enter your username: ");
     scanf("%s", username);
+    flushInputBuffer();
 
     int hSocket, read_size;
     struct sockaddr_in server;
-    char SendToServer[100] = {0};
+    char SendToServer[200] = {0};
     char server_reply[200] = {0};
     // Create socket
     hSocket = SocketCreate();
@@ -85,11 +92,11 @@ int main(int argc, char *argv[])
         return 1;
     }
     printf("Sucessfully conected with server\n");
-    char* requestBody[100];
+    char requestBody[100];
     strcpy(requestBody, "SET username ");
     strcat(requestBody, username);
     send(hSocket, requestBody, strlen(requestBody), 0);
-    printf("Sent username to server\n");
+    printf("Sent username to server.\n");
 
     // Communicate with the server
     printf("Enter the Message: ");
@@ -117,6 +124,12 @@ int main(int argc, char *argv[])
             {
                 printf("recv failed");
                 return 1;
+            }
+            else if (read_size == 0)
+            {
+                printf("Connection closed by the server\n");
+                // Handle closure, cleanup, or exit as needed
+                return 0; // Assuming 0 signifies a clean exit
             }
             printf("Server Response : %s\n\n", server_reply);
         }

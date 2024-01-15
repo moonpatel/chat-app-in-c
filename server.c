@@ -9,34 +9,33 @@
 #include <stdlib.h>
 
 // Text Colors
-#define ANSI_COLOR_BLACK   "\x1b[30m"
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_BLACK "\x1b[30m"
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_GREEN "\x1b[32m"
+#define ANSI_COLOR_YELLOW "\x1b[33m"
+#define ANSI_COLOR_BLUE "\x1b[34m"
 #define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_WHITE   "\x1b[37m"
+#define ANSI_COLOR_CYAN "\x1b[36m"
+#define ANSI_COLOR_WHITE "\x1b[37m"
 
 // Background Colors
-#define ANSI_BG_BLACK   "\x1b[40m"
-#define ANSI_BG_RED     "\x1b[41m"
-#define ANSI_BG_GREEN   "\x1b[42m"
-#define ANSI_BG_YELLOW  "\x1b[43m"
-#define ANSI_BG_BLUE    "\x1b[44m"
+#define ANSI_BG_BLACK "\x1b[40m"
+#define ANSI_BG_RED "\x1b[41m"
+#define ANSI_BG_GREEN "\x1b[42m"
+#define ANSI_BG_YELLOW "\x1b[43m"
+#define ANSI_BG_BLUE "\x1b[44m"
 #define ANSI_BG_MAGENTA "\x1b[45m"
-#define ANSI_BG_CYAN    "\x1b[46m"
-#define ANSI_BG_WHITE   "\x1b[47m"
+#define ANSI_BG_CYAN "\x1b[46m"
+#define ANSI_BG_WHITE "\x1b[47m"
 
 // Text Formatting
-#define ANSI_BOLD_TEXT     "\x1b[1m"
-#define ANSI_UNDERLINE     "\x1b[4m"
-#define ANSI_BLINK         "\x1b[5m"
-#define ANSI_INVERSE       "\x1b[7m"
+#define ANSI_BOLD_TEXT "\x1b[1m"
+#define ANSI_UNDERLINE "\x1b[4m"
+#define ANSI_BLINK "\x1b[5m"
+#define ANSI_INVERSE "\x1b[7m"
 
 // Reset Text Attributes
-#define ANSI_COLOR_RESET   "\x1b[0m"
-
+#define ANSI_COLOR_RESET "\x1b[0m"
 
 typedef struct Client
 {
@@ -136,12 +135,19 @@ void *handleConnection(void *ptr)
                 printf("recv failed");
                 return;
             }
+            else if (read_size == 0)
+            {
+                printf("Connection closed by the client: %d\n", sock);
+                // Handle closure, cleanup, or exit as needed
+                // For example, you might remove the client from a list of active clients
+                break; // Exiting the loop assuming the connection is closed
+            }
             if (strcmp(client_message, "quit") == 0)
             {
                 printf("Quitting: %d\n", sock);
                 break;
             }
-            printf(ANSI_COLOR_RED ANSI_BOLD_TEXT "%s (%d): " ANSI_COLOR_RESET, client.username, read_size);
+            printf(ANSI_COLOR_BLUE ANSI_BOLD_TEXT "%s (%d): " ANSI_COLOR_RESET, client.username, read_size);
             printf("%s", client_message);
         }
 
@@ -152,7 +158,7 @@ void *handleConnection(void *ptr)
         //     printf("Send failed");
         //     return NULL;
         // }
-        sleep(1);
+        // sleep(1);
     }
     close(sock);
     printf("Client disconnected: %d\n", sock);
