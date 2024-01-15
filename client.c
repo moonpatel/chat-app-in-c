@@ -62,6 +62,10 @@ int SocketReceive(int hSocket, char *Rsp, short RvcSize)
 // main driver program
 int main(int argc, char *argv[])
 {
+    char* username[20];
+    printf("Enter your username: ");
+    scanf("%s", username);
+
     int hSocket, read_size;
     struct sockaddr_in server;
     char SendToServer[100] = {0};
@@ -81,6 +85,13 @@ int main(int argc, char *argv[])
         return 1;
     }
     printf("Sucessfully conected with server\n");
+    char* requestBody[100];
+    strcpy(requestBody, "SET username ");
+    strcat(requestBody, username);
+    send(hSocket, requestBody, strlen(requestBody), 0);
+    printf("Sent username to server\n");
+
+    // Communicate with the server
     printf("Enter the Message: ");
     while (1)
     {
@@ -113,6 +124,7 @@ int main(int argc, char *argv[])
         else if (FD_ISSET(0, &readfds))
         {
             fgets(SendToServer, 200, stdin);
+            printf("Sending: %s", SendToServer);
             // Send data to the server
             SocketSend(hSocket, SendToServer, strlen(SendToServer));
         }

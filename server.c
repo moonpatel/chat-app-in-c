@@ -6,14 +6,78 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdlib.h>
+
+typedef struct Client
+{
+    int socketFd;
+    char *username;
+} Client;
+
+typedef enum
+{
+    SET,
+} Method;
+
+typedef enum
+{
+    USERNAME,
+    MESSAGE,
+} Parameter;
+
+typedef struct Request
+{
+    Method method;
+    Parameter parameter;
+    char *value;
+} Request;
+
+// parses the request body and returns a Request object
+Request *parseBody(char *requestBody)
+{
+    Request *req = NULL;
+
+    // FILE *strStream;
+    // strStream = fmemopen();
+    switch (requestBody[0])
+    {
+    // for now assume the client will only set username
+    case 'S':
+        req = (Request *)malloc(sizeof(Request));
+        int i = 0;
+        char *username = (char *)malloc(20 * sizeof(char));
+        while (requestBody[13 + i] != '\0') {
+            username[i] = requestBody[13 + i];
+            i++;
+        }
+        username[i] = '\0';
+        req->method = SET;
+        req->value = username;
+        req->parameter = USERNAME;
+        printf("Username: %s\n", username);
+        break;
+
+    default:
+        printf("Error parsing request body: %s\n", requestBody);
+        break;
+    }
+    return req;
+}
 
 void *handleConnection(void *ptr)
 {
     int sock = *((int *)ptr);
+    char requestBody[100];
     printf("New connection accepted: %d\n", sock);
     char client_message[200] = {0};
     char pMessage[200] = "Hello";
     char message[200] = "Hey!";
+    recv(sock, requestBody, 100, 0);
+    Request *req = parseBody(requestBody);
+    Client client;
+    client.socketFd = sock;
+    client.username = req->value;
+
     while (1)
     {
         memset(client_message, '\0', sizeof client_message);
@@ -41,11 +105,12 @@ void *handleConnection(void *ptr)
                 printf("recv failed");
                 return;
             }
-            if (strcmp(client_message, "quit") == 0) {
+            if (strcmp(client_message, "quit") == 0)
+            {
                 printf("Quitting: %d\n", sock);
                 break;
             }
-            printf("Client reply (%d) : %s\n", read_size, client_message);
+            printf("%s (%d) : %s", client.username, read_size, client_message);
         }
 
         // strcpy(message, "Message from server!");
@@ -113,7 +178,7 @@ int main(int argc, char *argv[])
         clientLen = sizeof(struct sockaddr_in);
         // accept connection from an incoming client
         sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&clientLen);
-        int* socketid = (int*)malloc(sizeof(int));
+        int *socketid = (int *)malloc(sizeof(int));
         *socketid = sock;
         if (*socketid < 0)
         {
