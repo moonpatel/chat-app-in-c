@@ -8,6 +8,36 @@
 #include <signal.h>
 #include <stdlib.h>
 
+// Text Colors
+#define ANSI_COLOR_BLACK   "\x1b[30m"
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_WHITE   "\x1b[37m"
+
+// Background Colors
+#define ANSI_BG_BLACK   "\x1b[40m"
+#define ANSI_BG_RED     "\x1b[41m"
+#define ANSI_BG_GREEN   "\x1b[42m"
+#define ANSI_BG_YELLOW  "\x1b[43m"
+#define ANSI_BG_BLUE    "\x1b[44m"
+#define ANSI_BG_MAGENTA "\x1b[45m"
+#define ANSI_BG_CYAN    "\x1b[46m"
+#define ANSI_BG_WHITE   "\x1b[47m"
+
+// Text Formatting
+#define ANSI_BOLD_TEXT     "\x1b[1m"
+#define ANSI_UNDERLINE     "\x1b[4m"
+#define ANSI_BLINK         "\x1b[5m"
+#define ANSI_INVERSE       "\x1b[7m"
+
+// Reset Text Attributes
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+
 typedef struct Client
 {
     int socketFd;
@@ -46,7 +76,8 @@ Request *parseBody(char *requestBody)
         req = (Request *)malloc(sizeof(Request));
         int i = 0;
         char *username = (char *)malloc(20 * sizeof(char));
-        while (requestBody[13 + i] != '\0') {
+        while (requestBody[13 + i] != '\0')
+        {
             username[i] = requestBody[13 + i];
             i++;
         }
@@ -110,7 +141,8 @@ void *handleConnection(void *ptr)
                 printf("Quitting: %d\n", sock);
                 break;
             }
-            printf("%s (%d) : %s", client.username, read_size, client_message);
+            printf(ANSI_COLOR_RED ANSI_BOLD_TEXT "%s (%d): " ANSI_COLOR_RESET, client.username, read_size);
+            printf("%s", client_message);
         }
 
         // strcpy(message, "Message from server!");
@@ -142,6 +174,14 @@ int BindCreatedSocket(int hSocket)
     /* Any incoming interface */
     remote.sin_addr.s_addr = htonl(INADDR_ANY);
     remote.sin_port = htons(ClientPort); /* Local port */
+    // Set SO_REUSEADDR option to ignore TIME_WAIT state of port
+    int reuse = 1;
+    if (setsockopt(hSocket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+    {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        return -1;
+    }
+
     iRetval = bind(hSocket, (struct sockaddr *)&remote, sizeof(remote));
     return iRetval;
 }
@@ -174,7 +214,7 @@ int main(int argc, char *argv[])
     // Accept and incoming connection
     while (1)
     {
-        printf("Waiting for incoming connections...\n");
+        printf(ANSI_COLOR_GREEN "Waiting for incoming connections...\n" ANSI_COLOR_RESET);
         clientLen = sizeof(struct sockaddr_in);
         // accept connection from an incoming client
         sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&clientLen);
