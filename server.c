@@ -45,18 +45,18 @@ typedef struct Client
 
 typedef enum
 {
-    SET,
-} Method;
-
-typedef enum
-{
     USERNAME,
     MESSAGE,
 } Parameter;
 
+typedef enum
+{
+    OK,
+    CLOSE
+} Status;
+
 typedef struct Request
 {
-    Method method;
     Parameter parameter;
     char *value;
 } Request;
@@ -65,6 +65,8 @@ typedef struct Request
 Request *parseBody(char *requestBody)
 {
     Request *req = NULL;
+    int i = 0;
+    req = (Request *)malloc(sizeof(Request));
 
     // FILE *strStream;
     // strStream = fmemopen();
@@ -72,96 +74,110 @@ Request *parseBody(char *requestBody)
     {
     // for now assume the client will only set username
     case 'S':
-        req = (Request *)malloc(sizeof(Request));
-        int i = 0;
-        char *username = (char *)malloc(20 * sizeof(char));
+        i = 0;
+        char *username = (char *)malloc(30 * sizeof(char));
         while (requestBody[13 + i] != '\0')
         {
             username[i] = requestBody[13 + i];
             i++;
         }
         username[i] = '\0';
-        req->method = SET;
         req->value = username;
         req->parameter = USERNAME;
         printf("Username: %s\n", username);
         break;
 
     default:
-        printf("Error parsing request body: %s\n", requestBody);
+        i = 0;
+        int length = strlen(requestBody);
+        char *message = (char *)malloc((length) * sizeof(char));
+        while (requestBody[i] != '\0')
+        {
+            message[i] = requestBody[i];
+            i++;
+        }
+        message[i] = '\0';
+        req->parameter = MESSAGE;
+        req->value = message;
         break;
     }
     return req;
 }
 
-void *handleConnection(void *ptr)
+Status handleConnection(void *ptr)
 {
-    int sock = *((int *)ptr);
+    Client *client = (Client *)ptr;
+    int sock = client->socketFd;
     char requestBody[100];
-    printf("New connection accepted: %d\n", sock);
     char client_message[200] = {0};
-    char pMessage[200] = "Hello";
     char message[200] = "Hey!";
-    recv(sock, requestBody, 100, 0);
-    Request *req = parseBody(requestBody);
-    Client client;
-    client.socketFd = sock;
-    client.username = req->value;
 
-    while (1)
+    // while (1)
+    // {
+    memset(client_message, '\0', sizeof client_message);
+    memset(message, '\0', sizeof message);
+
+    fd_set readfds;
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 10;
+
+    FD_ZERO(&readfds);
+    FD_SET(sock, &readfds);
+
+    // Receive a reply from the client
+    if (select(sock + 1, &readfds, NULL, NULL, &timeout) < 0)
     {
-        memset(client_message, '\0', sizeof client_message);
-        memset(message, '\0', sizeof message);
-
-        fd_set readfds;
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 10;
-
-        FD_ZERO(&readfds);
-        FD_SET(sock, &readfds);
-
-        // Receive a reply from the client
-        if (select(sock + 1, &readfds, NULL, NULL, &timeout) < 0)
+        printf("select failed");
+        return;
+    }
+    else if (FD_ISSET(sock, &readfds))
+    {
+        int read_size = recv(sock, client_message, 200, 0);
+        if (read_size < 0)
         {
-            printf("select failed");
+            printf("recv failed");
             return;
         }
-        else if (FD_ISSET(sock, &readfds))
+        else if (read_size == 0)
         {
-            int read_size = recv(sock, client_message, 200, 0);
-            if (read_size < 0)
-            {
-                printf("recv failed");
-                return;
-            }
-            else if (read_size == 0)
-            {
-                printf("Connection closed by the client: %d\n", sock);
-                // Handle closure, cleanup, or exit as needed
-                // For example, you might remove the client from a list of active clients
-                break; // Exiting the loop assuming the connection is closed
-            }
-            if (strcmp(client_message, "quit") == 0)
-            {
-                printf("Quitting: %d\n", sock);
-                break;
-            }
-            printf(ANSI_COLOR_BLUE ANSI_BOLD_TEXT "%s (%d): " ANSI_COLOR_RESET, client.username, read_size);
-            printf("%s", client_message);
+            printf(ANSI_COLOR_RED ANSI_BOLD_TEXT "%s (%d) left the chat." ANSI_COLOR_RESET "\n", client->username, sock);
+            // printf(ANSI_BG_MAGENTA ANSI_BOLD_TEXT "%s (%d) left the chat." ANSI_COLOR_RESET "\n", client->username, sock);
+            
+            // Handle closure, cleanup, or exit as needed
+            // Remove the client from a list of active clients
+            return CLOSE;
         }
-
-        // strcpy(message, "Message from server!");
-        // // Send some data
-        // if (send(sock, message, strlen(message), 0) < 0)
-        // {
-        //     printf("Send failed");
-        //     return NULL;
-        // }
-        // sleep(1);
+        if (strcmp(client_message, "quit") == 0)
+        {
+            printf("Quitting: %d\n", sock);
+            // break;
+        }
+        Request *req = parseBody(client_message);
+        if (req->parameter == USERNAME)
+        {
+            strcpy(client->username, req->value);
+            printf(ANSI_BG_YELLOW ANSI_BOLD_TEXT "%s joined the chat." ANSI_COLOR_RESET "\n", client->username);
+        }
+        else if (req->parameter == MESSAGE)
+        {
+            // printf("===================\n");
+            printf(ANSI_COLOR_BLUE ANSI_BOLD_TEXT "%s: " ANSI_COLOR_RESET, client->username);
+            printf("%s", req->value);
+        }
     }
-    close(sock);
-    printf("Client disconnected: %d\n", sock);
+    return OK;
+    // strcpy(message, "Message from server!");
+    // // Send some data
+    // if (send(sock, message, strlen(message), 0) < 0)
+    // {
+    //     printf("Send failed");
+    //     return NULL;
+    // }
+    // sleep(1);
+    // }
+    // close(sock);
+    // printf("Client disconnected: %d\n", sock);
 }
 short SocketCreate(void)
 {
@@ -191,8 +207,17 @@ int BindCreatedSocket(int hSocket)
     iRetval = bind(hSocket, (struct sockaddr *)&remote, sizeof(remote));
     return iRetval;
 }
+
 int main(int argc, char *argv[])
 {
+    int clientLimit = 30;
+    Client *clientSockets = (Client *)malloc(clientLimit * sizeof(Client));
+    for (int i = 0; i < clientLimit; i++)
+    {
+        clientSockets[i].socketFd = -1;
+        clientSockets[i].username = (char *)malloc(30 * sizeof(char));
+    }
+
     signal(SIGPIPE, SIG_IGN);
     int socket_desc, sock, clientLen, read_size;
     struct sockaddr_in server, client;
@@ -217,22 +242,55 @@ int main(int argc, char *argv[])
     printf("bind done\n");
     // Listen
     listen(socket_desc, 1);
+
+    printf(ANSI_COLOR_GREEN "Waiting for incoming connections..." ANSI_COLOR_RESET "\n");
     // Accept and incoming connection
     while (1)
     {
-        printf(ANSI_COLOR_GREEN "Waiting for incoming connections...\n" ANSI_COLOR_RESET);
         clientLen = sizeof(struct sockaddr_in);
-        // accept connection from an incoming client
-        sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&clientLen);
-        int *socketid = (int *)malloc(sizeof(int));
-        *socketid = sock;
-        if (*socketid < 0)
+
+        fd_set readfds;
+        struct timeval timeout;
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+
+        FD_ZERO(&readfds);
+        FD_SET(socket_desc, &readfds);
+
+        if (select(socket_desc + 1, &readfds, NULL, NULL, &timeout) < 0)
         {
-            perror("accept failed");
+            printf("select failed");
             return 1;
         }
-        pthread_t thread;
-        pthread_create(&thread, NULL, handleConnection, (void *)socketid);
+        else if (FD_ISSET(socket_desc, &readfds))
+        {
+            // accept connection from an incoming client, non blocking
+            int socketid = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&clientLen);
+            if (socketid < 0)
+            {
+                perror("accept failed");
+                return 1;
+            }
+            printf("Connection accepted: %d\n", socketid);
+            clientSockets[socketid].socketFd = socketid;
+        }
+        // else
+        // {
+        //     printf("No new connections\n");
+        // }
+
+        // pthread_t thread;
+        // pthread_create(&thread, NULL, handleConnection, (void *)socketid);
+        for (int i = 0; i < clientLimit; i++)
+            if (clientSockets[i].socketFd != -1)
+            {
+                Status status = handleConnection((void *)&clientSockets[i]);
+                if (status == CLOSE)
+                {
+                    clientSockets[i].socketFd = -1;
+                    memset(clientSockets[i].username, '\0', 30);
+                }
+            }
     }
     return 0;
 }
